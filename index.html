@@ -4,26 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Kelime">
-<meta name="theme-color" content="#1e1b4b">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#4f46e5">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
-<title>Kelime</title>
+<title>YDS Kelime</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <div id="progress"><div id="bar"></div></div>
-  <div id="stats"><span id="count"></span><button id="statsBtn" aria-label="İstatistik">📊</button></div>
-</header>
-<main id="stage"></main>
-<footer>
-  <button id="no" class="act no">✗ Bilmiyorum</button>
-  <button id="yes" class="act yes">Biliyorum ✓</button>
-</footer>
+<div id="app"></div>
 <div id="sheet" hidden></div>
-<script src="words.js"></script>
+<div id="toast" hidden></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<script src="words-yds.js"></script>
+<script src="words-legacy.js"></script>
+<script src="data.js"></script>
+<script src="store.js"></script>
+<script src="quiz.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

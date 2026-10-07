@@ -1,5 +1,5 @@
-// [İngilizce, Türkçe, Eş anlamlı, Örnek cümle]
-window.WORDS = [
+// Genel (YDS dışı) başlangıç kelimeleri. [İngilizce, Türkçe, Eş anlamlı, Örnek cümle]
+window.LEGACY_ROWS = [
 ["abandon","terk etmek","desert, leave","He had to abandon his car in the snow."],
 ["ability","yetenek, yeti","skill, talent","She has the ability to learn languages quickly."],
 ["accept","kabul etmek","agree to, receive","I accept your invitation with pleasure."],
@@ -99,4 +99,4 @@ window.WORDS = [
 ["useful","faydalı","helpful, handy","This app is really useful."],
 ["wonder","merak etmek, harika","ponder, marvel","I wonder what time it is."],
 ["worry","endişelenmek","fret, be anxious","Don't worry, everything will be fine."]
-].map((w,i)=>({id:i,en:w[0],tr:w[1],syn:w[2],ex:w[3]}));
+];
