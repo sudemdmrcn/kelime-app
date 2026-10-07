@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kelime">
+<meta name="theme-color" content="#1e1b4b">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Kelime</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div id="progress"><div id="bar"></div></div>
+  <div id="stats"><span id="count"></span><button id="statsBtn" aria-label="İstatistik">📊</button></div>
+</header>
+<main id="stage"></main>
+<footer>
+  <button id="no" class="act no">✗ Bilmiyorum</button>
+  <button id="yes" class="act yes">Biliyorum ✓</button>
+</footer>
+<div id="sheet" hidden></div>
+<script src="words.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
