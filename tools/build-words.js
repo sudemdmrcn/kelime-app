@@ -17,6 +17,8 @@ for (const f of files) {
     if (!Array.isArray(r) || r.length < 4 || r.slice(0, 4).some(x => typeof x !== 'string' || !x.trim())) { console.warn('EKSİK ALAN:', where); problems++; return; }
     if (r[4] != null && !POS.includes(r[4])) { console.warn('GEÇERSİZ TÜR:', where, r[4]); problems++; }
     if (r[5] != null && !(Array.isArray(r[5]) && r[5].every(x => Array.isArray(x) && x.length === 2))) { console.warn('GEÇERSİZ EK ANLAM:', where); problems++; return; }
+    if (r[6] != null && typeof r[6] !== 'string') { console.warn('GEÇERSİZ ÇEVİRİ:', where); problems++; }
+    if (r[6] == null) console.warn('ÇEVİRİ YOK (7. alan):', where);
     const key = r[0].trim().toLowerCase();
     if (seen.has(key)) { console.warn(`TEKRAR: ${where} (ilk: ${seen.get(key)})`); problems++; return; }
     seen.set(key, where);

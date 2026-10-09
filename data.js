@@ -1,9 +1,10 @@
 /* data.js: kelime verisini yükler, doğrular ve YDS boşluk-doldurma için çekim (inflection) yardımcıları sağlar.
 
    Satır formatı (words-yds.js / words-legacy.js):
-     [en, tr, syn, ex, pos?, extra?]
+     [en, tr, syn, ex, pos?, extra?, exTr?]
      pos   : verb | noun | adj | adv | phrasal
-     extra : [[tr, örnek cümle], ...]  (çok anlamlı kelimeler için opsiyonel)
+     extra : [[tr, örnek cümle], ...]  (çok anlamlı kelimeler için opsiyonel, yoksa null)
+     exTr  : örnek cümlenin Türkçe çevirisi (opsiyonel)
 
    Kart nesnesi: { key, en, tr, syn, ex, pos, extra, set:'yds'|'legacy', day }
    key = İngilizce kelimenin küçük harfli hali. İlerleme bu anahtarla saklanır; kelime eklemek
@@ -28,7 +29,7 @@
       let pos = r[4];
       if (pos != null && !POS.includes(pos)) { problems.push('Geçersiz tür: ' + where); pos = null; }
       let extra = Array.isArray(r[5]) ? r[5].filter(x => Array.isArray(x) && x.length === 2) : [];
-      const c = { key, en: r[0].trim(), tr: r[1].trim(), syn: r[2].trim(), ex: r[3].trim(), pos: pos || 'other', extra, set, day: set === 'yds' ? Math.floor(idx / DAY_SIZE) + 1 : 0 };
+      const c = { key, en: r[0].trim(), tr: r[1].trim(), syn: r[2].trim(), ex: r[3].trim(), exTr: typeof r[6] === 'string' ? r[6].trim() : '', pos: pos || 'other', extra, set, day: set === 'yds' ? Math.floor(idx / DAY_SIZE) + 1 : 0 };
       idx++;
       cards.push(c); byKey[key] = c;
     });

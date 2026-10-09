@@ -101,3 +101,4 @@ select{border-radius:10px;border:1px solid var(--line);background:var(--surface)
 #sheet h3{margin:0 0 8px}#sheet p{color:var(--mut);margin:6px 0 14px}
 #sheet .btn{margin-top:8px}
 #toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90%}
+.card .extr{margin-top:8px;font-size:15px;line-height:1.4;color:var(--mut)}

@@ -101,7 +101,7 @@
     const first = dir === 'en-tr' ? `<div class="tr">${esc(c.tr)}</div>` : `<div class="tr">${esc(c.en)}</div>`;
     const extra = c.extra.length ? `<div class="more">${c.extra.map(x => `<div><b>${esc(x[0])}</b><br><em>${esc(x[1])}</em></div>`).join('')}</div>` : '';
     const head = dir === 'en-tr' ? `<div class="en" style="font-size:30px">${esc(c.en)}</div>` : `<div class="en" style="font-size:24px;color:var(--mut)">${esc(c.tr)}</div>`;
-    return `${badge(c)}${head}${first}<div class="syn">≈ ${esc(c.syn)}</div><div class="ex">“${highlight(c)}”</div>${extra}`;
+    return `${badge(c)}${head}${first}<div class="syn">≈ ${esc(c.syn)}</div><div class="ex">“${highlight(c)}”</div>${c.exTr ? `<div class="extr">${esc(c.exTr)}</div>` : ''}${extra}`;
   }
 
   function renderStudy() {
@@ -207,7 +207,7 @@
     st.record(q.mode, ok);
     if (ok) Q.ok++;
     speak(c.en);
-    $('fb').innerHTML = `<div class="opt-reveal"><b>${esc(c.en)}</b> = ${esc(c.tr)}<br>≈ ${esc(c.syn)}${q.reveal ? `<br><i>“${q.reveal}”</i>` : ''}</div><button class="btn accent" id="nx" style="margin-top:10px">${Q.i + 1 < Q.qs.length ? 'Sonraki' : 'Sonucu gör'}</button>`;
+    $('fb').innerHTML = `<div class="opt-reveal"><b>${esc(c.en)}</b> = ${esc(c.tr)}<br>≈ ${esc(c.syn)}${q.reveal ? `<br><i>“${q.reveal}”</i>` : ''}${c.exTr && q.reveal ? `<br><span style="color:var(--mut)">${esc(c.exTr)}</span>` : ''}</div><button class="btn accent" id="nx" style="margin-top:10px">${Q.i + 1 < Q.qs.length ? 'Sonraki' : 'Sonucu gör'}</button>`;
     $('nx').onclick = () => { Q.i++; renderQuiz(); };
     $('nx').scrollIntoView({ block: 'nearest' });
   }
