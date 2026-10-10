@@ -49,7 +49,8 @@
     add(window.YDS_ROWS, 'yds');            // YDS önce işlenir, aynı kelime başka listede varsa YDS kazanır
     add(custom && custom.words, 'user');
     add(window.LEGACY_ROWS, 'legacy');
-    add(custom && custom.conj, 'conj');
+    add(window.CONJ_ROWS, 'conj');           // hazır bağlaçlar
+    add(custom && custom.conj, 'conj');      // kullanıcının eklediği bağlaçlar
     K.cards = cards; K.byKey = byKey; K.dataProblems = problems;
     K.dayCount = Math.ceil(cards.filter(c => c.set === 'yds').length / DAY_SIZE);
     if (problems.length) console.warn('[kelime] veri sorunları: ' + problems.join(' | '));

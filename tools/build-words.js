@@ -29,3 +29,25 @@ const out = '// OTOMATİK ÜRETİLDİ: node tools/build-words.js  (elle düzenle
   'window.YDS_ROWS = [\n' + rows.map(r => JSON.stringify(r)).join(',\n') + '\n];\n';
 fs.writeFileSync(path.join(root, 'words-yds.js'), out);
 console.log(`${files.length} blok, ${rows.length} kelime yazıldı, ${problems} sorun.`);
+
+// Bağlaçlar: data/conj-*.json -> words-conj.js. Satır: [en, tr, syn, ex, "conj", null, çeviri, kategori]
+const cfiles = fs.readdirSync(dir).filter(f => /^conj-\d+\.json$/.test(f)).sort();
+const cseen = new Set(), crows = [];
+let cproblems = 0;
+for (const f of cfiles) {
+  let arr;
+  try { arr = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); }
+  catch (e) { console.error(`${f}: geçerli JSON değil (${e.message})`); process.exit(1); }
+  arr.forEach((r, i) => {
+    const where = `${f} #${i + 1} (${r && r[0]})`;
+    if (!Array.isArray(r) || r.slice(0, 4).some(x => typeof x !== 'string' || !x.trim()) || typeof r[7] !== 'string') { console.warn('EKSİK ALAN:', where); cproblems++; return; }
+    const key = r[0].trim().toLowerCase();
+    if (cseen.has(key)) { console.warn('TEKRAR:', where); cproblems++; return; }
+    // örnek cümlede bağlaç geçmiyorsa boşluk doldurma sorusu üretilemez
+    const pat = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+    if (!new RegExp('\\b' + pat + '\\b', 'i').test(r[3])) { console.warn('CÜMLEDE YOK:', where); cproblems++; }
+    cseen.add(key); crows.push(r);
+  });
+}
+fs.writeFileSync(path.join(root, 'words-conj.js'), '// OTOMATİK ÜRETİLDİ: node tools/build-words.js  (kaynak: data/conj-*.json)\nwindow.CONJ_ROWS = [\n' + crows.map(r => JSON.stringify(r)).join(',\n') + '\n];\n');
+console.log(`${cfiles.length} bağlaç dosyası, ${crows.length} bağlaç yazıldı, ${cproblems} sorun.`);
