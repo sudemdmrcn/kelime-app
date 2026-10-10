@@ -1,5 +1,5 @@
 // Önbellek sürümünü her yayında artırın (VERSION). Ağ öncelikli, çevrimdışıyken önbellekten açılır.
-const VERSION = 'kelime-v4';
+const VERSION = 'kelime-v5';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'data.js', 'store.js', 'quiz.js', 'words-yds.js', 'words-legacy.js', 'manifest.json', 'icon-180.png', 'icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(

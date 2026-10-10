@@ -9,7 +9,13 @@
   const BLANK = '_______';
 
   function pickDistractors(card, n, pool) {
-    return K.shuffle(pool.filter(c => c.key !== card.key && c.pos === card.pos)).slice(0, n);
+    const same = K.shuffle(pool.filter(c => c.key !== card.key && c.pos === card.pos));
+    if (card.pos !== 'conj') return same.slice(0, n);
+    // Bağlaçta aynı kategorideki ve eş anlamlı listesindeki bağlaçlar boşluğa da uyabilir; önce farklı kategorileri seç.
+    const syn = K.splitSyn(card.syn).map(s => s.toLowerCase());
+    const ok = c => !syn.includes(c.en.toLowerCase());
+    const far = same.filter(c => ok(c) && (!card.cat || c.cat !== card.cat));
+    return [...far, ...same.filter(c => ok(c) && !far.includes(c))].slice(0, n);
   }
   const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
@@ -53,8 +59,9 @@
   }
 
   // Görülmüş kartlardan (önce vadesi gelenler) en fazla n soru üretir.
-  function build(mode, n) {
-    const active = st.activeCards();
+  // opts.set === 'conj' ise sadece bağlaçlardan soru üretilir.
+  function build(mode, n, opts) {
+    const active = opts && opts.set === 'conj' ? st.conjCards() : st.activeCards();
     const seen = active.filter(c => st.cs(c.key));
     const t = K.dayNum();
     const ordered = K.shuffle(seen.slice()).sort((a, b) => (st.cs(a.key).due <= t ? 0 : 1) - (st.cs(b.key).due <= t ? 0 : 1));

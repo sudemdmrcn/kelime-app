@@ -11,37 +11,57 @@
    ya da sıralamayı değiştirmek ilerlemeyi bozmaz. */
 (function () {
   const K = window.K = window.K || {};
-  const POS = ['verb', 'noun', 'adj', 'adv', 'phrasal'];
+  const POS = ['verb', 'noun', 'adj', 'adv', 'phrasal', 'conj'];
   const DAY_SIZE = 25;
   K.DAY_SIZE = DAY_SIZE;
-  K.POS_LABEL = { verb: 'verb', noun: 'noun', adj: 'adj', adv: 'adv', phrasal: 'phrasal', other: '' };
+  K.POS_LABEL = { verb: 'verb', noun: 'noun', adj: 'adj', adv: 'adv', phrasal: 'phrasal', conj: 'bağlaç', other: '' };
 
-  const problems = [];
-  const cards = [], byKey = {};
+  const STRICT = { yds: true, legacy: true };   // YDS ve genel listede 4 alan zorunlu; kullanıcı girişinde sadece en+tr
+  const keyOf = (en, set) => (set === 'conj' ? 'c:' : '') + en.trim().toLowerCase();
+  K.keyOf = keyOf;
 
-  function add(rows, set) {
-    let idx = 0;
-    (rows || []).forEach((r, i) => {
-      const where = `${set} #${i + 1} (${r && r[0]})`;
-      if (!Array.isArray(r) || r.length < 4 || r.slice(0, 4).some(x => typeof x !== 'string' || !x.trim())) { problems.push('Eksik alan: ' + where); return; }
-      const key = r[0].trim().toLowerCase();
-      if (byKey[key]) { problems.push('Tekrar: ' + where); return; }
-      let pos = r[4];
-      if (pos != null && !POS.includes(pos)) { problems.push('Geçersiz tür: ' + where); pos = null; }
-      let extra = Array.isArray(r[5]) ? r[5].filter(x => Array.isArray(x) && x.length === 2) : [];
-      const c = { key, en: r[0].trim(), tr: r[1].trim(), syn: r[2].trim(), ex: r[3].trim(), exTr: typeof r[6] === 'string' ? r[6].trim() : '', pos: pos || 'other', extra, set, day: set === 'yds' ? Math.floor(idx / DAY_SIZE) + 1 : 0 };
-      idx++;
-      cards.push(c); byKey[key] = c;
-    });
+  // Tek bir satırı doğrular ve kart nesnesine çevirir. Dönüş: { card } | { error }
+  function makeCard(r, set, idx) {
+    if (!Array.isArray(r) || typeof r[0] !== 'string' || typeof r[1] !== 'string' || !r[0].trim() || !r[1].trim()) return { error: 'İngilizce ve Türkçe alanları zorunlu.' };
+    const strict = STRICT[set];
+    if (strict && r.slice(0, 4).some(x => typeof x !== 'string' || !x.trim())) return { error: 'Eksik alan.' };
+    const s = x => (typeof x === 'string' ? x.trim() : '');
+    let pos = r[4];
+    if (set === 'conj') pos = 'conj';
+    else if (pos != null && !POS.includes(pos)) pos = null;
+    const extra = Array.isArray(r[5]) ? r[5].filter(x => Array.isArray(x) && x.length === 2) : [];
+    return { card: { key: keyOf(r[0], set), en: r[0].trim(), tr: r[1].trim(), syn: s(r[2]), ex: s(r[3]), exTr: s(r[6]), cat: set === 'conj' ? s(r[7]) : '', pos: pos || 'other', extra, set, day: set === 'yds' ? Math.floor(idx / DAY_SIZE) + 1 : 0 } };
   }
-  add(window.YDS_ROWS, 'yds');       // YDS önce işlenir, aynı kelime legacy'de varsa YDS kazanır
-  add(window.LEGACY_ROWS, 'legacy');
-  if (problems.length) console.warn('[kelime] veri sorunları:\n' + problems.join('\n'));
 
-  K.cards = cards;
-  K.byKey = byKey;
-  K.dataProblems = problems;
-  K.dayCount = Math.ceil(cards.filter(c => c.set === 'yds').length / DAY_SIZE);
+  let problems = [];
+  // Kart listesini yeniden kurar. custom: { words:[satır], conj:[satır] } (kullanıcının eklediği veriler)
+  K.reload = function (custom) {
+    const cards = [], byKey = {}; problems = [];
+    const add = (rows, set) => {
+      let idx = 0;
+      (rows || []).forEach((r, i) => {
+        const res = makeCard(r, set, idx), where = set + ' #' + (i + 1) + ' (' + (r && r[0]) + ')';
+        if (res.error) { problems.push(where + ': ' + res.error); return; }
+        if (byKey[res.card.key]) { problems.push('Tekrar: ' + where); return; }
+        idx++; cards.push(res.card); byKey[res.card.key] = res.card;
+      });
+    };
+    add(window.YDS_ROWS, 'yds');            // YDS önce işlenir, aynı kelime başka listede varsa YDS kazanır
+    add(custom && custom.words, 'user');
+    add(window.LEGACY_ROWS, 'legacy');
+    add(custom && custom.conj, 'conj');
+    K.cards = cards; K.byKey = byKey; K.dataProblems = problems;
+    K.dayCount = Math.ceil(cards.filter(c => c.set === 'yds').length / DAY_SIZE);
+    if (problems.length) console.warn('[kelime] veri sorunları: ' + problems.join(' | '));
+  };
+  K.checkRow = (row, set) => makeCard(row, set, 0).error || null;   // sadece yapı kontrolü
+  K.validateNew = function (row, set) {   // eklemeden önce kontrol: hata metni ya da null
+    const res = makeCard(row, set, 0);
+    if (res.error) return res.error;
+    if (K.byKey[res.card.key]) return '"' + res.card.en + '" zaten listede var.';
+    return null;
+  };
+  K.reload({});
 
   /* ---------- Çekim yardımcıları ---------- */
   // Düzensiz fiiller: kök -> [geçmiş, V3, -ing]. Listede olmayanlar kurala göre çekilir.
@@ -91,7 +111,7 @@
   function findInSentence(card) {
     const words = card.en.toLowerCase().split(/\s+/), tail = words.slice(1).map(esc).join('\\s+');
     let best = null;
-    for (const [kind, form] of allForms(words[0])) {
+    for (const [kind, form] of (card.pos === 'conj' ? [['base', words[0]]] : allForms(words[0]))) {
       const re = new RegExp('\\b' + esc(form) + (tail ? '\\s+' + tail : '') + '\\b', 'i');
       const m = re.exec(card.ex);
       if (m && (!best || m.index < best.start || (m.index === best.start && m[0].length > best.text.length)))

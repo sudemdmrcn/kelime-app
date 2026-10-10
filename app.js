@@ -5,7 +5,7 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const root = $('app');
-  let view = 'home', S = null, Q = null;
+  let view = 'home', S = null, Q = null, A = { kind: 'words', edit: null };
 
   /* ---------- Yardımcılar ---------- */
   function toast(msg) {
@@ -29,7 +29,8 @@
   function speak(t) {
     try { const u = new SpeechSynthesisUtterance(t); u.lang = 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
   }
-  const badge = c => c.pos && c.pos !== 'other' ? `<span class="badge ${c.pos}">${c.pos}</span>` : '';
+  const badge = c => c.pos === 'conj' ? `<span class="badge conj">bağlaç${c.cat ? ' · ' + esc(c.cat) : ''}</span>`
+    : c.pos && c.pos !== 'other' ? `<span class="badge ${c.pos}">${c.pos}</span>` : '';
   function go(v) { view = v; closeSheet(); render(); }
   function highlight(c) {
     const m = K.findInSentence(c);
@@ -57,6 +58,8 @@
         <button class="tile" data-go="cloze"><b>Boşluk doldurma</b><span>YDS tarzı, 5 şık</span></button>
         <button class="tile" data-go="syn"><b>Eş anlamlı</b><span>Doğru eş anlamlıyı seç</span></button>
         <button class="tile" data-go="hard"><b>Zor kelimeler</b><span>${hard} kelime</span></button>
+        <button class="tile" data-go="conj"><b>Bağlaçlar</b><span>${st.conjCards().length} bağlaç</span></button>
+        <button class="tile" data-go="add"><b>Kelime ekle</b><span>Bilmediklerini sen gir</span></button>
         <button class="tile" data-go="days"><b>Günler</b><span>${K.dayCount} gün, 25'er kelime</span></button>
         <button class="tile" data-go="stats"><b>İstatistik</b><span>${seenAny} kelime görüldü</span></button>
         <button class="tile" data-go="settings"><b>Ayarlar</b><span>Yedek, yön, limit</span></button>
@@ -66,7 +69,7 @@
     $('streak').onclick = () => toast('Üst üste çalıştığın gün sayısı');
     root.querySelectorAll('[data-go]').forEach(b => b.onclick = () => {
       const g = b.dataset.go;
-      if (g === 'cloze' || g === 'syn') startQuiz(g); else if (g === 'hard') startHard(); else go(g);
+      if (g === 'cloze' || g === 'syn') startQuiz(g); else if (g === 'hard') startHard(); else if (g === 'add') { A = { kind: 'words', edit: null }; go('add'); } else go(g);
     });
   }
 
@@ -86,6 +89,11 @@
     if (!k.length) { toast('Henüz zor kelime yok'); return; }
     startSession(K.shuffle(k), 'hard', 'Zor kelimeler');
   }
+  function startConj() {
+    const due = st.conjDueKeys(), fresh = st.conjUnseenKeys(st.conjNewAllowance());
+    if (!due.length && !fresh.length) { toast('Bugünlük bağlaç bitti'); return; }
+    startSession([...due, ...fresh], 'conj', 'Bağlaçlar');
+  }
   function startDay(d) {
     const keys = K.cards.filter(c => c.set === 'yds' && c.day === d).map(c => c.key);
     startSession(K.shuffle(keys), 'day', `Gün ${d}`);
@@ -101,7 +109,7 @@
     const first = dir === 'en-tr' ? `<div class="tr">${esc(c.tr)}</div>` : `<div class="tr">${esc(c.en)}</div>`;
     const extra = c.extra.length ? `<div class="more">${c.extra.map(x => `<div><b>${esc(x[0])}</b><br><em>${esc(x[1])}</em></div>`).join('')}</div>` : '';
     const head = dir === 'en-tr' ? `<div class="en" style="font-size:30px">${esc(c.en)}</div>` : `<div class="en" style="font-size:24px;color:var(--mut)">${esc(c.tr)}</div>`;
-    return `${badge(c)}${head}${first}<div class="syn">≈ ${esc(c.syn)}</div><div class="ex">“${highlight(c)}”</div>${c.exTr ? `<div class="extr">${esc(c.exTr)}</div>` : ''}${extra}`;
+    return `${badge(c)}${head}${first}${c.syn ? `<div class="syn">≈ ${esc(c.syn)}</div>` : ''}${c.ex ? `<div class="ex">“${highlight(c)}”</div>` : ''}${c.exTr ? `<div class="extr">${esc(c.exTr)}</div>` : ''}${extra}`;
   }
 
   function renderStudy() {
@@ -115,7 +123,7 @@
       <div class="stage"><div class="card" id="card">${isRev ? '<span class="rev">tekrar</span>' : ''}<span class="tag y">BİLDİM</span><span class="tag n">BİLMEDİM</span><span class="tag h">ZORLANDIM</span>
         <button class="speak" id="spk" aria-label="Seslendir">🔊</button><div id="face">${frontHTML(c, dir)}</div></div></div>
       <div class="actions"><button class="act no" data-g="0" disabled>Bilmedim</button><button class="act hard" data-g="1" disabled>Zorlandım</button><button class="act yes" data-g="2" disabled>Bildim</button></div></div>`;
-    $('back').onclick = () => go('home');
+    $('back').onclick = () => go(S.kind === 'conj' ? 'conj' : 'home');
     $('dir').onclick = () => { st.setSetting('dir', dir === 'en-tr' ? 'tr-en' : 'en-tr'); renderStudy(); };
     $('spk').onpointerdown = e => e.stopPropagation();
     $('spk').onclick = e => { e.stopPropagation(); speak(c.en); };
@@ -167,26 +175,26 @@
       <div class="done"><h2>🎉 Tamamlandı</h2><p>${S.done} kelime çalıştın. Bugün toplam ${d.reviewed} puanlama.</p>
       ${S.kind === 'daily' ? '<button class="btn accent" id="more">+10 yeni kelime ekle</button>' : ''}
       <button class="btn" id="home">Ana ekran</button></div></div>`;
-    $('back').onclick = $('home').onclick = () => go('home');
+    $('back').onclick = $('home').onclick = () => go(S.kind === 'conj' ? 'conj' : 'home');
     $('more') && ($('more').onclick = () => { st.state.daily.bonus += 10; st.save(); startDaily(); });
   }
 
   /* ---------- Quiz (boşluk doldurma, eş anlamlı) ---------- */
-  function startQuiz(mode) {
-    const r = K.quiz.build(mode, 10);
+  function startQuiz(mode, opts) {
+    const r = K.quiz.build(mode, 10, opts);
     if (!r.questions.length) {
       sheet(`<h3>Önce biraz kelime öğren</h3><p>${r.seenCount ? 'Görülen kelimelerden soru üretilemedi.' : 'Quiz için en az birkaç kelime görmüş olman gerekiyor.'} Günlük çalışmayı yapıp tekrar dene.</p><button class="btn accent" id="ok">Tamam</button>`).querySelector('#ok').onclick = closeSheet;
       return;
     }
-    Q = { mode, qs: r.questions, i: 0, ok: 0, answered: false };
+    Q = { mode, opts, qs: r.questions, i: 0, ok: 0, answered: false };
     view = 'quiz'; render();
   }
   function renderQuiz() {
     if (Q.i >= Q.qs.length) {
       root.innerHTML = `<div class="view"><div class="top"><button class="icon-btn" id="back">←</button><h1>Sonuç</h1></div><div class="done"><h2>${Q.ok} / ${Q.qs.length}</h2><p>doğru cevap</p>
         <button class="btn accent" id="again">Yeni set</button><button class="btn" id="home">Ana ekran</button></div></div>`;
-      $('back').onclick = $('home').onclick = () => go('home');
-      $('again').onclick = () => startQuiz(Q.mode);
+      $('back').onclick = $('home').onclick = () => go(Q.opts && Q.opts.set === 'conj' ? 'conj' : 'home');
+      $('again').onclick = () => startQuiz(Q.mode, Q.opts);
       return;
     }
     const q = Q.qs[Q.i]; Q.answered = false;
@@ -195,7 +203,7 @@
         <div class="prompt ${q.mode === 'syn' ? 'word' : ''}">${esc(q.prompt)}</div>
         <div class="opts">${q.options.map((o, i) => `<button class="opt" data-i="${i}"><b>${q.letters[i]}</b>${esc(o)}</button>`).join('')}</div>
         <div id="fb"></div></div></div>`;
-    $('back').onclick = () => go('home');
+    $('back').onclick = () => go(Q.opts && Q.opts.set === 'conj' ? 'conj' : 'home');
     root.querySelectorAll('.opt').forEach(b => b.onclick = () => answerQ(+b.dataset.i));
   }
   function answerQ(i) {
@@ -207,9 +215,101 @@
     st.record(q.mode, ok);
     if (ok) Q.ok++;
     speak(c.en);
-    $('fb').innerHTML = `<div class="opt-reveal"><b>${esc(c.en)}</b> = ${esc(c.tr)}<br>≈ ${esc(c.syn)}${q.reveal ? `<br><i>“${q.reveal}”</i>` : ''}${c.exTr && q.reveal ? `<br><span style="color:var(--mut)">${esc(c.exTr)}</span>` : ''}</div><button class="btn accent" id="nx" style="margin-top:10px">${Q.i + 1 < Q.qs.length ? 'Sonraki' : 'Sonucu gör'}</button>`;
+    $('fb').innerHTML = `<div class="opt-reveal"><b>${esc(c.en)}</b> = ${esc(c.tr)}${c.syn ? `<br>≈ ${esc(c.syn)}` : ''}${q.reveal ? `<br><i>“${q.reveal}”</i>` : ''}${c.exTr && q.reveal ? `<br><span style="color:var(--mut)">${esc(c.exTr)}</span>` : ''}</div><button class="btn accent" id="nx" style="margin-top:10px">${Q.i + 1 < Q.qs.length ? 'Sonraki' : 'Sonucu gör'}</button>`;
     $('nx').onclick = () => { Q.i++; renderQuiz(); };
     $('nx').scrollIntoView({ block: 'nearest' });
+  }
+
+  /* ---------- Bağlaçlar ---------- */
+  function renderConj() {
+    const all = st.conjCards(), due = st.conjDueKeys().length, fresh = st.conjUnseenKeys(st.conjNewAllowance()).length;
+    const seen = all.filter(c => st.cs(c.key)).length, learned = all.filter(c => st.isLearned(c.key)).length;
+    root.innerHTML = `<div class="view"><div class="top"><button class="icon-btn" id="back">←</button><h1>Bağlaçlar</h1></div><div class="scroll">
+      <div class="hero"><div class="big">${due + fresh} bağlaç</div><div class="sub">${due} tekrar · ${fresh} yeni · toplam ${all.length}, ${learned} öğrenildi</div>
+        <button class="btn primary" id="cs" ${due + fresh ? '' : 'disabled'}>${all.length ? (due + fresh ? 'Bağlaç çalış' : 'Bugünlük bitti 🎉') : 'Önce bağlaç ekle'}</button></div>
+      <div class="grid">
+        <button class="tile" id="cq"><b>Boşluk doldurma</b><span>Doğru bağlacı seç</span></button>
+        <button class="tile" id="cy"><b>Eş anlamlı</b><span>Benzer bağlacı bul</span></button>
+      </div>
+      <button class="btn accent" id="cadd" style="margin-top:12px">＋ Bağlaç ekle</button>
+      <div class="sect">Listem (${all.length})</div>
+      ${all.length ? all.map(c => `<div class="row"><div class="grow"><b>${esc(c.en)} ${badge(c)}</b><small>${esc(c.tr)}</small></div><small>${st.cs(c.key) ? (st.isLearned(c.key) ? '✓' : 'çalışılıyor') : 'yeni'}</small></div>`).join('') : '<p style="color:var(--mut)">Henüz bağlaç yok. "Bağlaç ekle" ile tek tek ya da toplu girebilirsin.</p>'}
+      </div></div>`;
+    $('back').onclick = () => go('home');
+    $('cs') && ($('cs').onclick = startConj);
+    $('cq').onclick = () => startQuiz('cloze', { set: 'conj' });
+    $('cy').onclick = () => startQuiz('syn', { set: 'conj' });
+    $('cadd').onclick = () => { A = { kind: 'conj', edit: null }; go('add'); };
+  }
+
+  /* ---------- Kelime / bağlaç ekleme (kullanıcı girişi) ---------- */
+  const CATS = ['zıtlık', 'sebep', 'sonuç', 'ekleme', 'koşul', 'zaman', 'amaç', 'karşılaştırma', 'örnekleme', 'vurgu', 'kabul/ödün'];
+  const POSES = ['verb', 'noun', 'adj', 'adv', 'phrasal'];
+  function renderAdd() {
+    const conj = A.kind === 'conj', set = conj ? 'conj' : 'user', list = st.state.custom[A.kind];
+    const ed = A.edit ? list.find(r => K.keyOf(r[0], set) === A.edit) : null;
+    const v = i => esc(ed && ed[i] ? ed[i] : '');
+    const sel = ed ? (conj ? ed[7] : ed[4]) : '';
+    const opts = (arr, cur) => '<option value="">' + (conj ? 'kategori seç' : 'tür seç (opsiyonel)') + '</option>' + arr.map(x => `<option ${x === cur ? 'selected' : ''}>${x}</option>`).join('');
+    root.innerHTML = `<div class="view"><div class="top"><button class="icon-btn" id="back">←</button><h1>${conj ? 'Bağlaç ekle' : 'Kelime ekle'}</h1></div><div class="scroll">
+      <div class="sect">${ed ? 'Kaydı düzenle' : 'Tek tek ekle'}</div>
+      <div class="form">
+        <input id="fEn" placeholder="İngilizce (${conj ? 'however' : 'abandon'})" value="${v(0)}" autocapitalize="none" autocorrect="off">
+        <input id="fTr" placeholder="Türkçe anlamı" value="${v(1)}">
+        <input id="fSyn" placeholder="Eş anlamlılar (virgülle, opsiyonel)" value="${v(2)}" autocapitalize="none">
+        <textarea id="fEx" rows="2" placeholder="İngilizce örnek cümle (opsiyonel, boşluk doldurma için gerekli)">${v(3)}</textarea>
+        <textarea id="fExTr" rows="2" placeholder="Cümlenin Türkçesi (opsiyonel)">${esc(ed && ed[6] ? ed[6] : '')}</textarea>
+        <select id="fType">${opts(conj ? CATS : POSES, sel)}</select>
+        <button class="btn accent" id="save">${ed ? 'Kaydet' : 'Ekle'}</button>
+        ${ed ? '<button class="btn" id="cancel">Vazgeç</button>' : ''}
+      </div>
+      ${ed ? '' : `<div class="sect">Toplu ekle</div>
+      <p class="hintp">Her satıra bir kayıt, alanları <b>|</b> ile ayır: İngilizce | Türkçe | eş anlamlı | örnek cümle | çeviri | ${conj ? 'kategori' : 'tür'}. Sadece ilk ikisi zorunlu. Ya da blok formatında JSON dizisi yapıştır.</p>
+      <textarea id="bulk" rows="6" placeholder="${conj ? 'however | ancak, yine de | nevertheless | The plan is good; however, it is costly. | Plan iyi; ancak maliyetli. | zıtlık' : 'abandon | terk etmek | desert, give up | He had to abandon his car. | Arabasını terk etmek zorunda kaldı. | verb'}"></textarea>
+      <button class="btn" id="bulkAdd" style="margin-top:8px">Toplu ekle</button>`}
+      <div class="sect">Eklediklerim (${list.length})</div>
+      ${list.length ? list.map(r => `<div class="row" data-k="${esc(K.keyOf(r[0], set))}"><button class="grow" data-edit style="all:unset;flex:1;min-width:0;cursor:pointer"><b>${esc(r[0])}</b><small>${esc(r[1])}</small></button><button class="icon-btn" data-del aria-label="Sil">🗑</button></div>`).join('') : '<p style="color:var(--mut)">Henüz bir şey eklemedin.</p>'}
+      </div></div>`;
+    const back = () => go(conj ? 'conj' : 'home');
+    $('back').onclick = () => { if (ed) { A.edit = null; renderAdd(); } else back(); };
+    const rowFromForm = () => {
+      const g = id => $(id).value.trim(), t = g('fType') || null;
+      return conj ? [g('fEn'), g('fTr'), g('fSyn'), g('fEx'), 'conj', null, g('fExTr'), t || ''] : [g('fEn'), g('fTr'), g('fSyn'), g('fEx'), t, null, g('fExTr')];
+    };
+    $('save').onclick = () => {
+      const row = rowFromForm();
+      const err = ed ? st.updateCustom(A.kind, A.edit, row) : st.addCustom(A.kind, row);
+      if (err) { toast(err); return; }
+      toast(ed ? 'Kaydedildi' : 'Eklendi: ' + row[0]); A.edit = null; renderAdd();
+    };
+    $('cancel') && ($('cancel').onclick = () => { A.edit = null; renderAdd(); });
+    $('bulkAdd') && ($('bulkAdd').onclick = () => bulkAdd($('bulk').value));
+    root.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      const k = b.closest('.row').dataset.k;
+      if (await confirmSheet('Silinsin mi?', 'Kayıt ve bu kelimenin ilerlemesi silinecek.', 'Sil')) { st.deleteCustom(A.kind, k); renderAdd(); }
+    });
+    root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { A.edit = b.closest('.row').dataset.k; renderAdd(); $('fEn').scrollIntoView({ block: 'center' }); });
+  }
+  function bulkAdd(text) {
+    const conj = A.kind === 'conj', t = text.trim();
+    if (!t) { toast('Önce metni yapıştır'); return; }
+    let rows;
+    try {
+      if (t[0] === '[') {
+        rows = JSON.parse(t);
+        if (!Array.isArray(rows)) throw 0;
+        rows = rows.map(r => { if (!Array.isArray(r)) return r; r = r.slice(); if (conj) r[4] = 'conj'; return r; });
+      } else {
+        rows = t.split(/\r?\n/).filter(l => l.trim()).map(l => {
+          const p = l.split(/\||\t/).map(x => x.trim());
+          return conj ? [p[0], p[1], p[2] || '', p[3] || '', 'conj', null, p[4] || '', p[5] || ''] : [p[0], p[1], p[2] || '', p[3] || '', POSES.includes(p[5]) ? p[5] : null, null, p[4] || ''];
+        });
+      }
+    } catch (e) { toast('Metin okunamadı. Biçimi kontrol et.'); return; }
+    let ok = 0; const bad = [];
+    rows.forEach((r, i) => { const err = st.addCustom(A.kind, r); if (err) bad.push((r && r[0] ? r[0] : '#' + (i + 1)) + ': ' + err); else ok++; });
+    renderAdd();
+    toast(ok + ' eklendi' + (bad.length ? ', ' + bad.length + ' atlandı (' + bad[0] + ')' : ''));
   }
 
   /* ---------- Günler ---------- */
@@ -310,7 +410,7 @@
 
   function render() {
     st.rollDay();
-    ({ home: renderHome, study: renderStudy, quiz: renderQuiz, days: renderDays, hard: renderHard, stats: renderStats, settings: renderSettings })[view]();
+    ({ home: renderHome, conj: renderConj, add: renderAdd, study: renderStudy, quiz: renderQuiz, days: renderDays, hard: renderHard, stats: renderStats, settings: renderSettings })[view]();
   }
   document.addEventListener('keydown', e => {
     if (view !== 'study' || !S) return;

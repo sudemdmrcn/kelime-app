@@ -102,3 +102,10 @@ select{border-radius:10px;border:1px solid var(--line);background:var(--surface)
 #sheet .btn{margin-top:8px}
 #toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:90%}
 .card .extr{margin-top:8px;font-size:15px;line-height:1.4;color:var(--mut)}
+.badge.conj{color:var(--p-conj)}
+:root{--p-conj:#0891b2}
+@media (prefers-color-scheme:dark){:root{--p-conj:#22d3ee}}
+.form{display:flex;flex-direction:column;gap:8px}
+.form input,.form textarea,#bulk,.form select{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:16px;padding:12px;min-height:48px}
+#bulk{margin-top:6px}
+.hintp{font-size:13px;color:var(--mut);line-height:1.45;margin:0 0 6px}

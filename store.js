@@ -4,7 +4,8 @@
    {
      v: 2, createdAt,
      cards:   { "<kelime>": { ef, int, reps, due, lapses, miss, seen, last } },
-     daily:   { day, newCount, reviewed, bonus },
+     daily:   { day, newCount, conjNew, reviewed, bonus },
+     custom:  { words:[satır], conj:[satır] }   // kullanıcının uygulamadan eklediği kelimeler ve bağlaçlar (yedeğe dahil)
      settings:{ newPerDay, autoReduce, legacy, dir, autoSpeak, startDay, lastBackup },
      stats:   { streak:{last,count}, modes:{ card|cloze|syn: {n, ok} } }
    }
@@ -20,6 +21,7 @@
 (function () {
   const K = window.K = window.K || {};
   const KEY = 'kelime-v2', OLD_KEY = 'kelime-v1';
+  const CONJ_PER_DAY = 10;   // günlük yeni bağlaç sayısı
   const OLD_BOX_DAYS = [0, 1, 3, 7, 14, 30];
 
   const dayNum = () => { const d = new Date(); return Math.floor((d.getTime() - d.getTimezoneOffset() * 6e4) / 864e5); };
@@ -28,7 +30,8 @@
 
   const defaults = () => ({
     v: 2, createdAt: Date.now(), cards: {},
-    daily: { day: dayNum(), newCount: 0, reviewed: 0, bonus: 0 },
+    daily: { day: dayNum(), newCount: 0, conjNew: 0, reviewed: 0, bonus: 0 },
+    custom: { words: [], conj: [] },
     settings: { newPerDay: 25, autoReduce: true, legacy: false, dir: 'en-tr', autoSpeak: true, startDay: 1, lastBackup: 0 },
     stats: { streak: { last: 0, count: 0 }, modes: { card: { n: 0, ok: 0 }, cloze: { n: 0, ok: 0 }, syn: { n: 0, ok: 0 } } }
   });
@@ -59,6 +62,8 @@
       if (!c || typeof c !== 'object') continue;
       s.cards[k] = { ef: +c.ef || 2.5, int: c.int | 0, reps: c.reps | 0, due: c.due | 0, lapses: c.lapses | 0, miss: c.miss | 0, seen: c.seen | 0, last: c.last | 0 };
     }
+    const okRows = a => (Array.isArray(a) ? a.filter(r => Array.isArray(r) && typeof r[0] === 'string' && typeof r[1] === 'string') : []);
+    s.custom = { words: okRows(src && src.custom && src.custom.words), conj: okRows(src && src.custom && src.custom.conj) };
     return s;
   }
 
@@ -73,10 +78,11 @@
     return defaults();
   }
   let state = load();
+  K.reload(state.custom);
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { memOnly = true; } }
   function rollDay() {
     const t = dayNum();
-    if (state.daily.day !== t) { state.daily = { day: t, newCount: 0, reviewed: 0, bonus: 0 }; save(); }
+    if (state.daily.day !== t) { state.daily = { day: t, newCount: 0, conjNew: 0, reviewed: 0, bonus: 0 }; save(); }
   }
   rollDay();
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
@@ -86,7 +92,12 @@
     get state() { return state; },
     get memOnly() { return memOnly; },
     save, rollDay,
-    activeCards() { return K.cards.filter(c => c.set === 'yds' || state.settings.legacy); },
+    // Günlük çalışmaya giren kartlar: YDS + kullanıcının eklediği kelimeler (+ ayarla genel liste). Bağlaçlar ayrı çalışılır.
+    activeCards() { return K.cards.filter(c => c.set === 'yds' || c.set === 'user' || (c.set === 'legacy' && state.settings.legacy)); },
+    conjCards() { return K.cards.filter(c => c.set === 'conj'); },
+    conjDueKeys() { const t = dayNum(); return shuffle(st.conjCards().filter(c => state.cards[c.key] && state.cards[c.key].due <= t).map(c => c.key)); },
+    conjUnseenKeys(limit) { return st.conjCards().filter(c => !state.cards[c.key]).slice(0, limit).map(c => c.key); },
+    conjNewAllowance() { return Math.max(0, CONJ_PER_DAY - state.daily.conjNew); },
     cs: key => state.cards[key],
     isDue: key => { const c = state.cards[key]; return !!c && c.due <= dayNum(); },
     isLearned: key => { const c = state.cards[key]; return !!c && c.reps >= 3; },
@@ -107,7 +118,7 @@
     unseenKeys(limit) {
       const sd = state.settings.startDay;
       const rest = st.activeCards().filter(c => !state.cards[c.key]);
-      const ord = c => c.set === 'legacy' ? 2 : c.day >= sd ? 0 : 1;
+      const ord = c => c.set === 'user' ? -1 : c.set === 'legacy' ? 2 : c.day >= sd ? 0 : 1;
       return rest.map((c, i) => [ord(c), i, c.key]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, limit).map(x => x[2]);
     },
     hardKeys() {
@@ -120,7 +131,7 @@
       rollDay();
       const t = dayNum();
       let c = state.cards[key];
-      if (!c) { c = state.cards[key] = { ef: 2.5, int: 0, reps: 0, due: t, lapses: 0, miss: 0, seen: t, last: 0 }; state.daily.newCount++; }
+      if (!c) { c = state.cards[key] = { ef: 2.5, int: 0, reps: 0, due: t, lapses: 0, miss: 0, seen: t, last: 0 }; if (key.startsWith('c:')) state.daily.conjNew++; else state.daily.newCount++; }
       if (g === 0) {
         if (c.reps > 0) c.lapses++;
         c.miss++; c.reps = 0; c.int = 0; c.ef = Math.max(1.3, c.ef - 0.2); c.due = t;
@@ -151,7 +162,7 @@
       let o; try { o = JSON.parse(text); } catch (e) { throw new Error('Dosya geçerli bir JSON değil.'); }
       if (!o || o.app !== 'kelime' || !o.state || typeof o.state.cards !== 'object') throw new Error('Bu bir Kelime yedek dosyası değil.');
       if (o.version > 2) throw new Error('Yedek daha yeni bir sürümden. Uygulamayı güncelleyin.');
-      state = normalize(o.state); rollDay(); save();
+      state = normalize(o.state); K.reload(state.custom); rollDay(); save();
     },
     markBackup() { state.settings.lastBackup = Date.now(); save(); },
     backupDue() {
@@ -160,7 +171,31 @@
       const ref = s.lastBackup || state.createdAt;
       return Date.now() - ref > 7 * 864e5;
     },
-    reset() { state = defaults(); save(); }
+    reset() { state = defaults(); K.reload(state.custom); save(); },
+
+    /* ---------- Kullanıcı girişi (kelime / bağlaç) ---------- */
+    // kind: 'words' | 'conj'. row: [en, tr, syn, ex, pos, extra, exTr, kategori]. Dönüş: hata metni ya da null
+    addCustom(kind, row) {
+      const err = K.validateNew(row, kind === 'conj' ? 'conj' : 'user');
+      if (err) return err;
+      state.custom[kind].push(row); K.reload(state.custom); save(); return null;
+    },
+    updateCustom(kind, oldKey, row) {
+      const set = kind === 'conj' ? 'conj' : 'user', list = state.custom[kind];
+      const i = list.findIndex(r => K.keyOf(r[0], set) === oldKey);
+      if (i < 0) return 'Kayıt bulunamadı.';
+      const bad = K.checkRow(row, set); if (bad) return bad;
+      const newKey = K.keyOf(row[0], set);
+      if (newKey !== oldKey && K.byKey[newKey]) return '"' + row[0].trim() + '" zaten listede var.';
+      list[i] = row;
+      if (newKey !== oldKey && state.cards[oldKey]) { state.cards[newKey] = state.cards[oldKey]; delete state.cards[oldKey]; }
+      K.reload(state.custom); save(); return null;
+    },
+    deleteCustom(kind, key) {
+      const set = kind === 'conj' ? 'conj' : 'user';
+      state.custom[kind] = state.custom[kind].filter(r => K.keyOf(r[0], set) !== key);
+      delete state.cards[key]; K.reload(state.custom); save();
+    }
   };
 
   function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
